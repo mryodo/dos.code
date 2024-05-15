@@ -208,7 +208,7 @@ function generateDelaunayMatrices(N = 4; δ = 0.1, ν = 0.7 )
       σ1 =  eigvals( Matrix( H ) )
 
       m1 = size(L1, 1)
-      return H, Hd, Hu, σ1, L1, Ld, Lu, σ, m1,  - 1 + 1e-6 , B1, B2, L0, H0
+      return H, Hd, Hu, σ1, L1, Ld, Lu, σ, m1,  - 1 + 1e-6 , B1, B2, L0, H0, edges2, trians
 end
 
 
