@@ -42,173 +42,79 @@ end
 
 
 N = 20
-n = N + 4
+m0 = N + 4
 H, Hd, Hu, σ1, L1, Ld, Lu, σ, m1,  α, B1, B2, L0, H0, edges2, trians = generateDelaunayMatrices( N, ν = 0.75 );
-W2 = spdiagm( 0.5 * rand( size( B2, 2)) .+ 0.5 )
 m2 = size( trians, 1 )
 
 
-L1 = B2 * W2 * W2 * B2' 
-p = getExactMeasure( B2, L1, W2 )
+W1 = spdiagm( 0.5 * rand( m1 ) .+ 0.5 )
 
-
-m0 = n
-
+L0 = B1 * W1 * W1 * B1' 
 @btime pinv( Matrix( L0 ) );
-tmp = B2 * randn( m2, Int(round((m1-m0)/3)));
-@btime qr( tmp );
+#   70.041 μs (21 allocations: 45.55 KiB)
+
+@btime getExactMeasure( B1, L0, W1 );
+#   98.667 μs (29 allocations: 426.33 KiB)
+
+Ld = W1 * B1' * B1 * W1
+λ = eigs(Ld, which=:LM, nev=1)[1][1]
+H = 1 / ( λ + 1e-6 ) * Ld 
 
 
 
-1
+function exactLDoS( k, σ, Q ; h = 1e-3 )
+      bins = vec( 0:h:1)
+      return [ sum( Q[k, ( σ .< bins[ i+ 1 ] ) .&& ( σ .>= ( (i == 1 ) ? -1e-6 : bins[i] ) )] .^ 2 ) for i in 1:size( bins, 1 ) - 1 ]
+end
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-trians2 = trians[1:2, :]
-Π =  1 ./ ( m2 * p ) 
-
-seq = [1; 2; 1; 3; 4; 5; 7]
-
-function getMultMatrix(seq, m2)
-      dict = countmap( seq )
-      mult = zeros(Int, m2 )
-      for key in keys(dict)
-            mult[ key ] = dict[ key ]
+function getDmkExact( H, M, m1 )
+      dmk = zeros( m1, size(1:2:M, 1) )
+      T0 = I
+      T1 = H
+      for i in 1:2:M
+            dmk[:, Int( ( i + 1 ) / 2 )] = diag( T1 )
+            T0 = 2 * H * T1 - T0
+            T1 = 2 * H * T0 - T1
       end
-      return mult
+      return dmk
 end
 
-function compareSpectral( A, B )
-      return maximum( [ eigmax( Matrix(A - B) ), eigmax( Matrix(B - A) ) ] )
-end
-
-
-function sparsificationProgress( p, L1, B2, W2, m1, m2; rep = 12, ν = 30, step = 30 )
-      dists = zeros( rep, size(4:step:ν*round( m1*log(m1) ), 1)) 
-      for jj in 1:rep
-            seq = sample( 1:m2, Weights(p), 3)
-            dist = []
-      
-            for i in 4:step:ν*round( m1*log(m1) )
-                  seq = [seq; sample( 1:m2, Weights(p), 10)]
-                  mult = getMultMatrix( seq, m2 )
-                  Π =  1 ./ ( size( seq, 1) * p ) 
-                  dist = [dist; compareSpectral( L1, B2 * W2 * W2 * diagm( Π .* mult ) * B2' ) ]
-            end
-            dists[jj, :] = dist
+function fromDmk2LDoS( dmk, M; h = 1e-3 )
+      bins = vec( 0:h:1)
+      intTm = zeros( size(1:2:M, 1), size(bins, 1) - 1  )
+      for m in 1:2:M
+            intTm[ Int( (m+1) /2 ), : ] = ( sin.( m * acos.( bins[1:end-1] ) ) - sin.( m * acos.( bins[2:end] ) ) ) / m
       end
-      return dists, mean(dists; dims=1)'
-end
-
-function perturbMeasure( p; ϵ = 1e-4 )
-      δ = ϵ * randn( size( p, 1 ) )
-      p1 = p + δ
-      p1[ p1 .< 0 ] .= 1e-10
-      return p1 / sum( p1 )
-end
-
-_, meanDist = sparsificationProgress( p, L1, B2, W2, m1, m2; rep = 12, ν = 30, step = 30 )
-p1 = perturbMeasure( p; ϵ = 1e-2 * 1/m2 )
-_, meanDist1 = sparsificationProgress( p1, L1, B2, W2, m1, m2; rep = 12, ν = 30, step = 30 )
-p2 = perturbMeasure( p; ϵ = 1e-1 * 1/m2 )
-_, meanDist2 = sparsificationProgress( p2, L1, B2, W2, m1, m2; rep = 12, ν = 30, step = 30 )
-p3 = perturbMeasure( p; ϵ = 2*1e-1 * 1/m2 )
-_, meanDist3 = sparsificationProgress( p3, L1, B2, W2, m1, m2; rep = 12, ν = 30, step = 30 )
-p4 = perturbMeasure( p; ϵ = 4*1e-1 * 1/m2 )
-_, meanDist4 = sparsificationProgress( p4, L1, B2, W2, m1, m2; rep = 12, ν = 30, step = 30 )
-
-begin
-      plot()
-      plot!( meanDist, lw = 3, color = cols[1], labels="unperturbed", alpha=0.5 )
-      plot!( meanDist1, lw = 3, color = cols[2], labels=L"\varepsilon=\frac{1}{100 m_2}", alpha=0.5 )
-      plot!( meanDist2, lw = 3, color = cols[3], labels=L"\varepsilon=\frac{1}{10 m_2}", alpha=0.5 )
-      plot!( meanDist3, lw = 3, color = cols[4], labels=L"\varepsilon=\frac{1}{5 m_2}", alpha=0.5 )
-      plot!( meanDist4, lw = 3, color = cols[6], labels=L"\varepsilon=\frac{2}{5 m_2}", alpha=0.5 )
-      plot!( yscale = :log10, legend = :topright )
-end
-
-savefig("perturbed_sparse.tex")
-savefig("perturbed_sparse.pdf")
-
-
-
-
-
-
-rep = 25
-
-dists = zeros( rep, size(4:10:30*round( m1*log(m1) ), 1)) 
-
-for jj in 1:rep
-      seq = sample( 1:m2, Weights(p), 3)
-      dist = []
-
-      for i in 4:10:30*round( m1*log(m1) )
-            seq = [seq; sample( 1:m2, Weights(p), 10)]
-            mult = getMultMatrix( seq, m2 )
-            Π =  1 ./ ( size( seq, 1) * p ) 
-            dist = [dist; compareSpectral( L1, B2 * W2 * W2 * diagm( Π .* mult ) * B2' ) ]
-      end
-      dists[jj, :] = dist
-end
-
-begin
-      plot()
-      plot!( dists', lw=4, color = cols[2], alpha=0.1, labels="" )
-      plot!( mean(dists; dims=1)', lw=4, color = cols[1], labels="" )
-      plot!( yscale = :log10 )
+      return dmk * intTm
 end
 
 
-##########
 
 
 
+σ, Q = eigen( Matrix( H ) )
+μk = exactLDoS( 1, σ, Q; h = 1/20 )
+ldos = reduce( hcat, [ exactLDoS( k, σ, Q; h =1/20 ) for k in 1:m1 ] )
 
+M = 21
+dmk = getDmkExact( H, M, m1 )
+dLDoS = fromDmk2LDoS( dmk, M; h = 1/20 )
+err = norm( (ldos - dLDoS')[2:end, :], Inf ) / norm( ldos[2:end, :], Inf )
 
+measure1 = sum( ldos[2:end, :] ; dims=1)'
+measure1 = measure1 / sum( measure1 )
+measure2 = sum( (dLDoS')[2:end, :] ; dims=1)'
+measure2 = measure2 / sum( measure2 )
 
+test = getExactMeasure( B1, L0, W1 )
+"""
+    getOddMomentsExact( σ1; moments_num = 1000 )
 
+TBW
+"""
+function getOddMomentsExact( σ; M = 1000 )
+      return [ diag( cos.( m * acos.( σ ) ) ) for m in 1:2:M-1 ]
+end
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-##################################################
+σ = eigvals( Matrix( H ) )
+getOddMomentsExact( σ )

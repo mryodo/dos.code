@@ -169,7 +169,7 @@ function generateDelauney(N=4)
 end
 
 
-function generateDelaunayMatrices(N = 4; δ = 0.1, ν = 0.7 )
+function generateDelaunayMatrices(N = 4; δ = 0.1)
       #points, edges2, trians = generateDelauney( N )
       
       #n = N + 4
@@ -184,7 +184,7 @@ function generateDelaunayMatrices(N = 4; δ = 0.1, ν = 0.7 )
       #      trians = trians[1:end .!= ind, :]
       #end
       
-      n, points, ν_init, edges2, trians = sparseDelaunay( N = N, ν = ν )
+      n, points, ν_init, edges2, trians = sparseDelaunay( N = N, ν = 0.7 )
 
       B1 = B1fromEdges( n, edges2 )
       B2 = B2fromTrig( edges2, trians)
@@ -208,7 +208,7 @@ function generateDelaunayMatrices(N = 4; δ = 0.1, ν = 0.7 )
       σ1 =  eigvals( Matrix( H ) )
 
       m1 = size(L1, 1)
-      return H, Hd, Hu, σ1, L1, Ld, Lu, σ, m1,  - 1 + 1e-6 , B1, B2, L0, H0, edges2, trians
+      return H, Hd, Hu, σ1, L1, Ld, Lu, σ, m1,  - 1 + 1e-6 , B1, B2, L0, H0
 end
 
 
